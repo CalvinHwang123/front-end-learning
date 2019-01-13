@@ -1,0 +1,33 @@
+[{
+  "text": "我是 json 文件的数据", 
+  "icon": "glyphicon glyphicon-stop", 
+  "selectedIcon": "glyphicon glyphicon-stop", 
+  "color": "#000",
+  "backColor": "#fff", 
+  "href": "#node-1", 
+  "selectable": true,
+  "state": { 
+    "disabled": false, 
+    "expanded": true, 
+    "selected": false 
+  },
+  "tags": ["available", "1", "2"], 
+  "nodes": [ 
+    { 
+      "text": "没错，正是在下",
+      "nodes": [
+        {
+          "text": "子节点",
+          "nodes": [ { "text": "孙节点" } ]
+        },
+        {
+          "text": "子节点2"
+        },
+        {
+          "text": "子节点3",
+          "nodes": [ { "text": "孙节点3" } ]
+        }
+      ]
+    }
+  ]
+}]

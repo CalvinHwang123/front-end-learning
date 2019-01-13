@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>bootstrap-treeview 使用小记</title>
+  <link rel="stylesheet" href="./static/css/bootstrap/3.3.7/css/bootstrap.min.css">
+  <link rel="stylesheet" href="./static/css/bootstrap-treeview.min.css">
+  <style>
+    /*居中好看些*/
+    .tree-container { width: 50%; margin: 50px auto; }
+  </style>
+</head>
+<body>
+  <div class="tree-container">
+    <div id="tree"></div>
+  </div>
+
+  <script src="./static/js/jquery.min.js"></script>
+  <script src="./static/js/bootstrap-treeview.min.js"></script>
+  <script>
+    function getTree() {
+      // return [{ text: '孤孤单单' }]
+      // return [{ text: '有一个子节点', nodes: [{ text: '正是在下' }] }]
+      // 比较完整的节点规范
+      /*return [{
+        text: '我有一个子节点哦', // 显示文本
+        icon: 'glyphicon glyphicon-stop', // 默认状态图标，默认是 glyphicon stop，注意不要使用 bootstrap 4
+        selectedIcon: 'glyphicon glyphicon-stop', // 选中状态的图标
+        color: '#000', // 默认状态文本颜色
+        backColor: '#fff', // 默认状态背景色
+        href: '#node-1', // 链接？待研究
+        selectable: true, // 是否可选中，比如仅仅根节点设置为不可选中
+        state: { // 初始化的状态（支持 4 种）
+          // checked: true, // 是否勾选
+          disabled: false, // 是否可用
+          expanded: true, // 是否折叠
+          selected: false // 是否选中
+        },
+        tags: ['available', '1', '2'], // 节点的右侧徽章
+        nodes: [ // 子节点
+          { 
+            text: '没错，正是在下',
+            nodes: [
+              {
+                text: '子节点',
+                nodes: [ { text: '孙节点' } ]
+              },
+              {
+                text: '子节点2'
+              },
+              {
+                text: '子节点3',
+                nodes: [ { text: '孙节点3' } ]
+              }
+            ]
+          },
+          {
+            text: '我没有子节点啊',
+            state: {
+              checked: false
+            }
+          }
+        ]
+      }]*/
+
+      var arr = [];
+      for (var i = 0; i < 300; i++) {
+        arr.push({
+          text: 'text_' + i,
+          nodes: [
+            {
+              text: 'subText_' + i
+            },
+            {
+              text: 'subText__' + i
+            }
+          ]
+        })
+      }
+      return [
+        {
+          text: 'hello',
+          nodes: arr
+        }
+      ];
+
+    }
+
+    // p.s. Chrome 默认不允许跨域请求，就算是在同一路径的本地文件也不行，这里可以使用 Firefox 测试下
+    function getJsonTree() {
+      var data = null;
+      $.ajax({
+        url: './data.json',
+        async: false, // 同步，使得 success 回调函数为 data 变量 赋值
+        dataType: 'JSON',
+        success: function (res) {
+          data = res;
+        }
+      })
+      return data;
+    }
+
+    // ---------- 级联勾选说明 start ---------- 
+    // bootst-treeview 2.1.5 （另外作者实现）已经有级联勾选的功能了
+    // 详情 https://github.com/patternfly/patternfly-bootstrap-treeview
+    
+    // 递归设置半勾选状态
+    function partlyCheckParent(node) {
+      var liArr = document.getElementsByTagName('li');
+      //debugger
+      for (var j = 0; j < liArr.length; j++) {
+        var li = liArr[j];
+        //debugger
+        var nodeid = li.getAttribute('data-nodeid') * 1;
+        if (nodeid === node.nodeId) {
+          var checkIcon = $($(li).find('span[class*="check-icon"]'));
+          $(checkIcon).attr('class', 'icon check-icon glyphicon glyphicon-expand');
+          node.state.checked = false;
+          //break;
+        }
+      }
+    }
+
+    // 递归勾选父级
+    function checkParent(nodeId, checked) {
+      if (nodeId === 0) return; // 一级节点
+      var parent = $('#tree').treeview('getParent', nodeId);
+      var siblings = $('#tree').treeview('getSiblings', nodeId); // 兄弟节点
+      parent.state.checked = checked; // 父级节点先跟随当前节点
+      if (siblings) {
+        // p.s. 这里使用 forEach 似乎不能使用 break，导致多次重复判断
+        // 待优化，或者改成普通 for 循环
+
+        for (var i = 0; i < siblings.length; i++) {
+          var sibling = siblings[i];
+          if (sibling.state.checked !== checked
+              && !checked) { // 兄弟节点 check 状态不同
+            parent.state.checked = sibling.state.checked; // 父级节点跟随状态
+            // $($($('#tree').find('li')[0]).find('.check-icon')).attr('class', 'icon check-icon glyphicon glyphicon-expand');
+            
+            partlyCheckParent(parent);
+
+            break;
+          }
+        }
+
+      }
+      checkParent(parent.nodeId, parent.state.checked);
+    }
+
+    // 递归勾选子级
+    function checkChildren(nodeId, checked) {
+      var node = $('#tree').treeview('getNode', nodeId);
+      if (!node.nodes) return; // 叶子节点
+      node.nodes.forEach(n => {
+        n.state.checked = checked;
+        checkChildren(n.nodeId, checked);
+      })
+    }
+
+    // 实现级联勾选
+    function cascadeCheck(nodeId, checked) {
+      var start = new Date().getTime();
+      // 向上更新状态
+      checkParent(nodeId, checked);
+      // 向下更新状态
+      checkChildren(nodeId, checked);
+      // alert('耗时：' + (new Date().getTime() - start) + ' ms')
+    }
+
+    // ---------- 级联勾选说明 end ---------- 
+
+    $(function () {
+      $('#tree').treeview({
+        data: getTree(), // 核心选项，用于展示的数据
+        // data: getJsonTree(),
+        // backColor: 'pink', // 此处设置的属性会全局生效（除非节点对象自己额外设置）
+        showBorder: false,
+        borderColor: 'green', // 边框颜色，如果不想要边框，设置 option: showBorder 为 false
+        showCheckbox: true,
+        // checkedIcon: 'glyphicon glyphicon-dashboard', // 勾选图标，需要设置 option: showCheck 为 true 才有效
+        // uncheckedIcon: 'glyphicon glyphicon-unchecked', // 勾选图标，需要设置 option: showCheck 为 true 才有效
+        collapseIcon: 'glyphicon glyphicon-flash', // 折叠图标，默认 min
+        expandIcon: 'glyphicon glyphicon-earphone', // 展开图标，默认 plus
+        color: '#ccc', // 此处设置的属性会全局生效（除非节点对象自己额外设置）
+        emptyIcon: 'glyphicon glyphicon-record', // 叶子节点图标，默认为 glyphicon，即空
+        enableLinks: true, // 启用超链接，需要在节点对象设置 href 属性
+        highlightSearchResults: true, // 高亮搜索结果，待研究
+        // highlightSelected: false, // 高亮选中，默认 true
+        // levels: 3, // 默认状态展开的层级，默认 2
+        multiSelect: true, // 是否允许多选
+        showIcon: false, // 是否显示默认状态的图标
+        nodeIcon: 'glyphicon glyphicon-usd', // 默认状态节点图标，全局生效，除非节点对象自己额外设置
+        onhoverColor: 'gray', // 默认状态下，鼠标经过节点颜色
+        selectedIcon: 'glyphicon glyphicon-floppy-disk', // 选中状态的图标，全局生效，除非节点对象自己额外设置
+        selectedBackColor: '#ffa500',
+        selectedColor: '#fff',
+        showTags: true, // 是否显示右侧徽章
+
+        /*onNodeSelected: function (event, data) { // 执行 selectNode 方法触发的事件
+          console.log('onNodeSelected trigged...')
+          console.log(event, data)
+        },*/
+
+        end: 1 // 写着玩
+      })
+
+      var treeView = $('#tree').treeview(true); // 这个特殊的方法返回 treeview 实例
+      var treeView2 = $('#tree').data('treeview'); // treeview 实例也保存在 DOM 元素数据中,可以使用插件的 id 'treeview' 访问。
+      // console.log(treeView === treeView2) // output: true
+
+      // List of Methods
+      // checkAll(options)
+      /*setTimeout(function () {
+        // treeView2.checkAll()
+        // 写法2
+        $('#tree').treeview('checkAll', { silent: true }) // silent: true 表示抑制相应事件的触发
+      }, 3000)*/
+
+      // checkNode(node | nodeId, options)
+      // treeView2.checkNode(1)
+      // $('#tree').treeview('checkNode', [ 1, { silent: true } ])
+      
+      // selectNode(node | nodeId, options)
+      // $('#tree').treeview('selectNode', [ 1, { silent: false } ])
+
+      // collapseAll(options)
+      // $('#tree').treeview('collapseAll', { silent: true })
+      
+      // collapseNode(node | nodeId, options)
+      // 如果不想要折叠子节点，ignoreChildren: true 
+      // $('#tree').treeview('collapseNode', [ 0, { silent: true, ignoreChildren: true } ]);
+      
+      // getCollapsed 返回指定 nodeId 下折叠状态的节点数组
+      $('#tree').treeview('getCollapsed', 0);
+
+      // getParent 返回指定 nodeId 的父节点
+      $('#tree').treeview('getParent', 3)
+
+      // getSiblings 返回指定 nodeId 的兄弟节点
+      $('#tree').treeview('getSiblings', 4)
+
+      // search(pattern, options)
+      $('#tree').treeview('search', [ '子节点', {
+        ignoreCase: true,     // 大小写敏感
+        exactMatch: true,    // 精确匹配，like or equals
+        revealResults: true,  // 匹配后展开节点
+      }]);
+
+      // toggleNodeChecked 切换触发 nodeChecked or nodeUnchecked 事件
+      // $('#tree').treeview('toggleNodeChecked', [ 1, { silent: true } ]);
+
+      // List of Events
+      $('#tree').on('nodeSelected', function (event, data) {
+        // console.log(data)
+      })
+
+      // p.s. 级联勾选推荐使用第三方实现的 treeview 2.0+
+      $('#tree').on('nodeChecked', function (event, data) {
+        /*cascadeCheck(data.nodeId, true)
+        console.log($('#tree').treeview('getSelected'))*/
+      })
+      $('#tree').on('nodeUnchecked', function (event, data) {
+        /*cascadeCheck(data.nodeId, false)*/
+      })
+
+      $('#tree').treeview('selectNode', [ 1, { silent: false } ])
+
+      //debugger
+
+    })
+
+  </script>
+</body>
+</html>
